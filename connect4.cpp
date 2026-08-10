@@ -20,9 +20,31 @@ char redPiece = 'R';
 char yellowPiece = 'Y';
 char noPiece = 'E'; // empty
 
+char turn = 'R';
+
 Color CLEAR = Color{255, 255, 255, 0};
 Color EMPTY = Color{64, 64, 64, 255};
 Color BG_COLOR = Color{36, 44, 158, 255};
+
+struct AnimatingPiece {
+  bool active = false;
+  int col = 0;
+  int targetRow = 0;
+  float currentY = 0.0f;
+  float targetY = 0.0f;
+  float speed = 1600.0f;
+  char color = 'E';
+};
+
+AnimatingPiece currentAnimation;
+
+float GetRowY(int row) {
+  return (row + 1) * BUFFER_SPACE + row * PIECE_SIZE * 2 + PIECE_SIZE;
+}
+
+float GetColX(int col) {
+  return (col + 1) * BUFFER_SPACE + col * PIECE_SIZE * 2 + PIECE_SIZE;
+}
 
 class Piece {
 public:
@@ -38,46 +60,42 @@ using Coords = std::tuple<int, int>;
 Coords GetMouseCoords() {
   int x = GetMouseX();
   int y = GetMouseY();
-
   int grid_x = x / (BUFFER_SPACE + PIECE_SIZE * 2);
-  int grid_y = y / (BUFFER_SPACE + PIECE_SIZE * 2);
 
-  if (grid_x < 0 || grid_x >= COLUMNS || grid_y < 0 || grid_y >= ROWS) {
+  if (grid_x < 0 || grid_x >= COLUMNS) {
     return {-1, -1};
   }
 
-  int centerX =
-      (grid_x + 1) * BUFFER_SPACE + grid_x * PIECE_SIZE * 2 + PIECE_SIZE;
-  int centerY =
-      (grid_y + 1) * BUFFER_SPACE + grid_y * PIECE_SIZE * 2 + PIECE_SIZE;
-
-  int dx = x - centerX;
-  int dy = y - centerY;
-  if ((dx * dx + dy * dy) > (PIECE_SIZE * PIECE_SIZE)) {
-    return {-1, -1};
+  int grid_y = y / (BUFFER_SPACE + PIECE_SIZE * 2);
+  if (grid_y < 0 || grid_y >= ROWS) {
+    grid_y = 0;
   }
 
   return {grid_x, grid_y};
 }
 
-void DrawTiles(Board board) {
+void DrawPiece(Piece piece) {
   Color drawColor = EMPTY;
+  if (piece.color == 'R') {
+    drawColor = RED;
+  }
+  else if (piece.color == 'Y') {
+    drawColor = YELLOW;
+  }
+  else {
+    drawColor = EMPTY;
+  }
+  DrawCircle(
+      (piece.x + 1) * BUFFER_SPACE + piece.x * PIECE_SIZE * 2 + PIECE_SIZE,
+      (piece.y + 1) * BUFFER_SPACE + piece.y * PIECE_SIZE * 2 + PIECE_SIZE,
+      PIECE_SIZE, drawColor);
+}
+
+void DrawPieces(Board board) {
   for (int i = 0; i < COLUMNS; i++) {
     for (int j = 0; j < ROWS; j++) {
       Piece piece = board[j][i];
-      if (piece.color == 'R') {
-        drawColor = RED;
-      }
-      else if (piece.color == 'Y') {
-        drawColor = YELLOW;
-      }
-      else {
-        drawColor = EMPTY;
-      }
-      DrawCircle(
-          (piece.x + 1) * BUFFER_SPACE + piece.x * PIECE_SIZE * 2 + PIECE_SIZE,
-          (piece.y + 1) * BUFFER_SPACE + piece.y * PIECE_SIZE * 2 + PIECE_SIZE,
-          PIECE_SIZE, drawColor);
+      DrawPiece(piece);
     }
   }
 }
@@ -94,6 +112,49 @@ void DrawMouseHover() {
   }
 }
 
+void UpdateAndDrawAnimation(Board &board, AnimatingPiece &anim) {
+  if (!anim.active)
+    return;
+  anim.currentY += anim.speed * GetFrameTime();
+
+  if (anim.currentY >= anim.targetY) {
+    anim.currentY = anim.targetY;
+    anim.active = false;
+    board[anim.targetRow][anim.col].color = anim.color;
+  }
+  Color drawColor = (anim.color == 'R') ? RED : YELLOW;
+  DrawCircle(GetColX(anim.col), anim.currentY, PIECE_SIZE, drawColor);
+}
+
+void PlayerInput(Board &board, char &turn, AnimatingPiece &anim) {
+  if (anim.active)
+    return;
+  Coords coords = GetMouseCoords();
+  int col = std::get<0>(coords);
+
+  if (col < 0 || col >= COLUMNS)
+    return;
+
+  if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+    int targetRow = -1;
+    for (int r = ROWS - 1; r >= 0; r--) {
+      if (board[r][col].color == 'E') {
+        targetRow = r;
+        break;
+      }
+    }
+
+    if (targetRow != -1) {
+      anim.active = true;
+      anim.col = col;
+      anim.targetRow = targetRow;
+      anim.currentY = GetRowY(-1);
+      anim.targetY = GetRowY(targetRow);
+      anim.color = turn;
+      turn = (turn == 'R') ? 'Y' : 'R';
+    }
+  }
+}
 int main() {
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Connect 4");
   SetTargetFPS(60);
@@ -113,9 +174,16 @@ int main() {
 
     DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BG_COLOR);
 
-    DrawTiles(pieces);
+    DrawPieces(pieces);
 
     DrawMouseHover();
+    PlayerInput(pieces, turn, currentAnimation);
+
+    if (!currentAnimation.active) {
+      DrawMouseHover();
+    }
+
+    UpdateAndDrawAnimation(pieces, currentAnimation);
 
     EndDrawing();
   }
