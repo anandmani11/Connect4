@@ -1,0 +1,27 @@
+  while (WindowShouldClose() == false) {
+    BeginDrawing();
+    ClearBackground(RAYWHITE);
+
+    DrawRectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, BG_COLOR);
+    DrawPieces(pieces);
+    UpdateAndDrawAnimation(pieces, currentAnimation);
+
+    DrawMouseHover();
+    PlayerInput(pieces, turn, currentAnimation);
+
+    if (!currentAnimation.active) {
+      DrawMouseHover();
+    }
+
+    DrawTexture(boardTexture, 0, 0, WHITE);
+
+    EndDrawing();
+  }
+
+
+
+  Dr Racket
+  Python
+  C++
+  Java
+  

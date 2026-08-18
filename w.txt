@@ -1,0 +1,4 @@
+Ground blocks not aligned with the player placed blocks,
+No collision for the player placed blocks - fixed isGrounded to detect blocks on a x/y grid
+can go outside of the world
+break blocks?
